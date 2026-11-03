@@ -1,168 +1,567 @@
-<html>
+<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OBS水印发生器</title>
+    <link rel="stylesheet" href="https://yubo.run/assets/css/fusion-pixel.css">
     <style>
-        body {
-            background-color: #000;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
+        html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+        body { background: #000; }
+        #div_container { position: relative; width: 100%; height: 100%; overflow: hidden; }
+        .content { position: absolute; left: 0; top: 0; color: var(--content-color, #fff); white-space: nowrap; pointer-events: none; }
+        #text_content, #time_content, #image_content { border: var(--content-border, 0px) solid currentColor; }
+        .white-box { border: 2px solid currentColor; box-sizing: border-box; }
+        #clock_content {
+            font: 24px "fusion-pixel-12px-proportional-latin", monospace;
+            text-shadow: 0 0 8px currentColor; letter-spacing: 2px;
         }
-
-        #container {
-            width: 100%;
-            height: 100%;
-            position: relative;
+        #content_image { display: block; }
+        [hidden] { display: none !important; }
+        #div_settings {
+            position: absolute; inset: 0 0 auto; z-index: 10; max-height: 100%;
+            box-sizing: border-box; overflow: auto; padding: 12px 16px;
+            background: #eee; color: #111; font: 14px/1.6 sans-serif;
         }
-
-        .box {
-            position: absolute;
-            border: 2px solid #FFF;
+        h2, p { margin: 0 0 10px; }
+        fieldset { margin: 0 0 10px; padding: 6px 10px; border: 1px solid #888; }
+        label { display: inline-block; }
+        input[type="number"] { width: 70px; }
+        .select-field { display: inline-block; vertical-align: top; }
+        .option-picker { display: inline-block; vertical-align: top; }
+        .option-picker summary {
+            cursor: pointer; padding: 1px 6px; border: 1px solid #888;
+            background: #fff; color: #111; line-height: 1.6;
+        }
+        .option-picker summary:focus-visible { outline: 2px solid #006b52; outline-offset: 1px; }
+        .picker-options { padding: 4px 6px; border: 1px solid #888; border-top: 0; background: #fff; }
+        .picker-options label { display: block; cursor: pointer; white-space: nowrap; }
+        .picker-options label:hover { background: #ddd; }
+        #settings_error { color: #a00; }
+        #scan_texture, #scanline { position: absolute; pointer-events: none; inset: 0; }
+        #scan_texture {
+            background: repeating-linear-gradient(to bottom, rgb(255 255 255 / 3.25%) 0 1px, transparent 1px 4px);
+        }
+        #scanline {
+            bottom: auto; height: 180px; will-change: transform;
+            background:
+                linear-gradient(#00edb8b8, #00edb8b8) bottom / 100% 1px no-repeat,
+                linear-gradient(to bottom,
+                    rgb(0 237 184 / 0%) 0% 20%, rgb(0 237 184 / 0.1%) 30%,
+                    rgb(0 237 184 / 0.5%) 40%, rgb(0 237 184 / 1.3%) 50%,
+                    rgb(0 237 184 / 2.7%) 60%, rgb(0 237 184 / 4.8%) 70%,
+                    rgb(0 237 184 / 7.6%) 80%, rgb(0 237 184 / 11.3%) 90%,
+                    rgb(0 237 184 / 15%) 98%, rgb(0 237 184 / 16%) 100%);
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <div id="box0" class="box"></div>
-        <div id="box1" class="box"></div>
-        <div id="box2" class="box"></div>
+    <section id="div_settings" aria-label="设置">
+        <p>使用方法：在 OBS“来源”添加“浏览器源”，URL 填写本页面链接，再使用“交互”调整设置。点击画面可显示或隐藏设置。</p>
+        <h2>设置</h2>
+        <fieldset>
+            <legend>显示内容（可多选）</legend>
+            <label><input type="checkbox" id="show_text" checked>文字</label>
+            <input type="text" id="content_text" placeholder="在页面上显示的文字" value="Hello World!" aria-label="显示文字"><br>
+            <label><input type="checkbox" id="show_time">当前时间（日期和时间）</label><br>
+            <label><input type="checkbox" id="show_clock">扫描线时钟（时:分:秒）</label>
+            <span class="select-field">位置：<select id="clock_position" aria-label="时钟位置">
+                <option value="topright">固定右上</option><option value="topleft">固定左上</option>
+                <option value="bottomright">固定右下</option><option value="bottomleft">固定左下</option>
+                <option value="center">固定居中</option><option value="moving">跟随移动</option>
+            </select></span><br>
+            <label><input type="checkbox" id="show_image">图片</label>
+            <input accept="image/*" type="file" id="image_file" aria-label="选择图片"><br>
+            <label><input type="checkbox" id="show_box" checked>随机移动白框（第一版）</label>
+            <span class="select-field">数量：<select id="random_box_count" aria-label="随机移动白框数量"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></span><br>
+            <label><input type="checkbox" id="show_bounce_box">反弹白框</label>
+            <span class="select-field">数量：<select id="bounce_box_count" aria-label="反弹白框数量"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></span>
+        </fieldset>
+        <p>
+            <label><input type="checkbox" id="scan_enabled" checked>扫描线特效</label>
+            <span>随扫描线从上到下逐行亮起、保持后渐隐；关闭后持续显示。</span><br>
+            <span class="select-field">内容颜色：<select id="content_color" aria-label="内容颜色"><option value="white">白色</option><option value="green">绿色（wei-matrix）</option></select></span>（文字、时间、时钟和白框；图片保留原色）<br>
+            <label>完全显示时间：<input type="number" id="scan_hold" min="0" step="0.05" value="3.25"> 秒</label>
+            <label>渐隐时间：<input type="number" id="scan_fade" min="0" step="0.05" value="3.25"> 秒</label>（滚轮调整，每次 0.05 秒）<br>
+            <label><input type="checkbox" id="content_border">文字、时间和图片外框</label><br>
+            <label><input type="checkbox" id="random_shake" checked>随机抖动</label>
+            <label>幅度：<input type="number" id="random_shake_range" min="0" max="100" value="1"> px</label><br>
+            <label>缩放：<input type="number" id="scale" min="1" max="1000" value="100"> %</label>
+            <label>速度：<input type="number" id="speed" min="0.05" max="10" step="0.05" value="1"> x</label>
+            <button type="button" id="reset_scale_speed">重置缩放和速度</button>
+        </p>
+        <p><button type="button" id="hide_settings">隐藏设置</button></p>
+        <p id="settings_error" role="alert" hidden></p>
+    </section>
+    <div id="div_container">
+        <div id="text_content" class="content"></div>
+        <div id="time_content" class="content"></div>
+        <div id="image_content" class="content" hidden><img id="content_image" alt="所选图片"></div>
+        <div class="content white-box"></div>
+        <div class="content white-box"></div>
+        <div class="content white-box"></div>
+        <div class="content white-box" hidden></div>
+        <div class="content white-box" hidden></div>
+        <div class="content white-box bounce-box" hidden></div>
+        <div class="content white-box bounce-box" hidden></div>
+        <div class="content white-box bounce-box" hidden></div>
+        <div class="content white-box bounce-box" hidden></div>
+        <div class="content white-box bounce-box" hidden></div>
+        <div id="clock_content" class="content" hidden></div>
+        <div id="scan_texture" aria-hidden="true"></div>
+        <div id="scanline" aria-hidden="true"></div>
     </div>
-</body>
-<script>
-    const SCREEN_WIDTH = 1920;
-    const SCREEN_HEIGHT = 1080 * 0.6;
+    <script>
+        const get = id => document.getElementById(id);
+        const page_id = new URLSearchParams(location.search).get('id') || 'default';
+        const storage_key = `white_box_v3_settings:${page_id}`;
+        const checkbox_ids = ['show_text', 'show_time', 'show_clock', 'show_image', 'show_box', 'show_bounce_box', 'content_border', 'scan_enabled', 'random_shake'];
+        const number_limits = { random_shake_range: [0, 100, 1], scale: [1, 1000, 100], speed: [0.05, 10, 1], random_box_count: [1, 5, 3], bounce_box_count: [1, 5, 3], scan_hold: [0, Infinity, 3.25], scan_fade: [0, Infinity, 3.25] };
+        const clock_positions = ['topright', 'topleft', 'bottomright', 'bottomleft', 'center', 'moving'];
+        let clock_position = 'topright';
+        const content_colors = { white: '#ffffff', green: '#008866' };
+        const settings_panel = get('div_settings');
+        const image = get('content_image');
+        const mask_property = 'maskImage' in get('div_container').style ? 'maskImage' : 'webkitMaskImage';
+        // OBS 交互使用页面内菜单，避免依赖浏览器原生弹出窗口。
+        const select_controls = [...document.querySelectorAll('select')].map(select => {
+            const picker = document.createElement('details');
+            picker.className = 'option-picker';
+            const summary = document.createElement('summary');
+            const options = document.createElement('div');
+            options.className = 'picker-options';
+            const radios = [...select.options].map(option => {
+                const label = document.createElement('label');
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = `${select.id}_choice`;
+                radio.value = option.value;
+                label.append(radio, document.createTextNode(option.textContent));
+                options.append(label);
+                radio.addEventListener('change', event => {
+                    event.stopPropagation();
+                    select.value = radio.value;
+                    picker.open = false;
+                    update_settings();
+                    save_settings();
+                    summary.focus();
+                });
+                return radio;
+            });
+            picker.append(summary, options);
+            select.after(picker);
+            select.hidden = true;
+            picker.addEventListener('toggle', () => {
+                if (picker.open) {
+                    for (const control of select_controls) {
+                        if (control.picker !== picker) control.picker.open = false;
+                    }
+                }
+            });
+            return { select, picker, summary, radios };
+        });
+        document.addEventListener('click', event => {
+            for (const { picker } of select_controls) {
+                if (!picker.contains(event.target)) picker.open = false;
+            }
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape') return;
+            for (const { picker, summary } of select_controls) {
+                if (picker.open) { picker.open = false; summary.focus(); }
+            }
+        });
+        let current_image = '';
+        let scan_enabled = true;
+        let scale = 1;
+        let speed = 1;
+        let shake_range = 1;
+        let random_box_count = 3;
+        let bounce_box_count = 3;
+        let scan_hold_ms = 3250;
+        let scan_fade_ms = 3250;
+        let scan_start = performance.now();
+        // 亮线单独交由浏览器播放，不再等待每帧的内容和遮罩计算。
+        const scan_animation = get('scanline').animate([
+            { transform: 'translateY(-180px)' }, { transform: 'translateY(100vh)' }
+        ], { duration: 8000, iterations: Infinity });
+        scan_animation.startTime = scan_start;
+        let previous_phase = 0;
+        let previous_line = 0;
+        let previous_time = scan_start;
+        let last_clock_second = -1;
+        const items = [...document.querySelectorAll('.content')].map(element => ({
+            element, box: element.classList.contains('white-box'), bouncing_box: element.classList.contains('bounce-box'), x: Math.random() * innerWidth * 0.7,
+            y: Math.random() * innerHeight * 0.7, dx: 1, dy: 1,
+            width: 20, height: 40, ratio: 2, display_level: 1, box_index: 0,
+            row_lit: [], previous_y: null, previous_height: 0, mask: null
+        }));
 
-    const MIN_WIDTH = 20;
-    const MAX_WIDTH = 120;
-    // 长宽比
-    const MIN_RATIO = 2;
-    const MAX_RATIO = 2.5;
+        const boxes = items.filter(item => item.box && !item.bouncing_box);
+        for (const [index, item] of items.filter(item => item.bouncing_box).entries()) {
+            item.box_index = index;
+            item.width = 20 + Math.random() * 100;
+            item.ratio = 2 + Math.random() * 0.5;
+        }
+        let plus_threshold = 0.8;
+        let minus_threshold = 0.2;
+        let box_elapsed = 0;
+        const surprise_probability = 0;
+        for (const [index, item] of boxes.entries()) {
+            item.box_index = index;
+            item.x = Math.floor(Math.random() * innerWidth);
+            item.y = Math.floor(Math.random() * innerHeight * 0.6 * 0.5);
+        }
 
-    const SURPRICE_PROB = 0;
-    const DISPLAY_THRESHOLD = 0.2;
-    let PLUS_THRESHOLD = 0.8;
-    let MINUS_THRESHOLD = 0.2;
-    let box_status = [
-        {
-            'x': 0,
-            'y': 0,
-            'w': MIN_WIDTH,
-            'h': MIN_WIDTH * MIN_RATIO,
-            'd': 1,
-            'xs': 1,
-            'ys': 1,
-        },
-        {
-            'x': 0,
-            'y': 0,
-            'w': MIN_WIDTH,
-            'h': MIN_WIDTH * MIN_RATIO,
-            'd': 1,
-            'xs': 1,
-            'ys': 1,
-        },
-        {
-            'x': 0,
-            'y': 0,
-            'w': MIN_WIDTH,
-            'h': MIN_WIDTH * MIN_RATIO,
-            'd': 1,
-            'xs': 1,
-            'ys': 1,
-        },
-    ]
-
-    function random_change(n, step, a, b, mt, pt) {
-        let r = Math.random();
-        if (Math.random() < 0.5) {
-            step = step * 2;
-        }
-        if (n - step <= a) {
-            return n + step;
-        }
-        else if (n + step >= b) {
-            return n - step;
-        }
-        // PLUS_THRESHOLD
-        else if (r > pt && n + step <= b) {
-            return n + step;
-        }
-        // MINUS_THRESHOLD
-        else if (r <= mt && n - step >= a) {
-            return n - step;
-        }
-        else {
+        // 保留第一版的随机游走及阈值参数顺序，不使用其他内容的匀速反弹。
+        function random_change(n, step, a, b, mt, pt) {
+            const r = Math.random();
+            if (Math.random() < 0.5) step *= 2;
+            if (n - step <= a) return n + step;
+            if (n + step >= b) return n - step;
+            if (r > pt && n + step <= b) return n + step;
+            if (r <= mt && n - step >= a) return n - step;
             return n;
         }
-    }
 
-    function init_box_status() {
-        for (let elm_id = 0; elm_id < 3; elm_id++) {
-            box_status[elm_id]['x'] = Math.floor(Math.random() * SCREEN_WIDTH);
-            box_status[elm_id]['y'] = Math.floor(Math.random() * SCREEN_HEIGHT * 0.5);
-        }
-    }
-
-    function update_box_status() {
-        for (let elm_id = 0; elm_id < 3; elm_id++) {
-            if (!(PLUS_THRESHOLD - MINUS_THRESHOLD > 0.3 && PLUS_THRESHOLD - MINUS_THRESHOLD < 0.7) || Math.random() < 0.5) {
-                PLUS_THRESHOLD = random_change(PLUS_THRESHOLD,   0.1, 0.5, 1, 0.3, 0.7);
-                MINUS_THRESHOLD = random_change(MINUS_THRESHOLD, 0.1, 0, 0.5, 0.3, 0.7);
-            }
-
-            elm = document.getElementById(`box${elm_id}`);
-            box_status[elm_id]['x'] = random_change(box_status[elm_id]['x'], 1 * box_status[elm_id]['xs'], 0, SCREEN_WIDTH, PLUS_THRESHOLD, MINUS_THRESHOLD);
-            box_status[elm_id]['y'] = random_change(box_status[elm_id]['y'], 1 * box_status[elm_id]['ys'], 0, SCREEN_HEIGHT, PLUS_THRESHOLD, MINUS_THRESHOLD);
-            box_status[elm_id]['w'] = random_change(box_status[elm_id]['w'], 1 * Math.random() < 0.5 ? 1 : -1, MIN_WIDTH, MAX_WIDTH, PLUS_THRESHOLD, MINUS_THRESHOLD);
-            box_status[elm_id]['h'] = random_change(box_status[elm_id]['h'], 1 * Math.random() < 0.5 ? 1 : -1, box_status[elm_id]['w'] * MIN_RATIO, box_status[elm_id]['w'] * MAX_RATIO, PLUS_THRESHOLD, MINUS_THRESHOLD);
-            box_status[elm_id]['r'] = random_change(box_status[elm_id]['r'], 0.1, MIN_RATIO, MAX_RATIO), PLUS_THRESHOLD, MINUS_THRESHOLD;
-            box_status[elm_id]['d'] = random_change(box_status[elm_id]['d'], 0.1, 0, 1, PLUS_THRESHOLD, MINUS_THRESHOLD);
-
-            if (box_status[elm_id]['x'] > SCREEN_WIDTH) {
-                box_status[elm_id]['x'] = Math.floor(Math.random() * SCREEN_WIDTH);
-            }
-            if (box_status[elm_id]['y'] > SCREEN_HEIGHT) {
-                box_status[elm_id]['y'] = Math.floor(Math.random() * SCREEN_HEIGHT);
-            }
-            if (box_status[elm_id]['w'] < MIN_WIDTH) {
-                box_status[elm_id]['w'] = MIN_WIDTH;
-            }
-            if (box_status[elm_id]['w'] > MAX_WIDTH) {
-                box_status[elm_id]['w'] = MAX_WIDTH;
-            }
-            if (box_status[elm_id]['h'] < box_status[elm_id]['w'] * MIN_RATIO) {
-                box_status[elm_id]['h'] = box_status[elm_id]['w'] * MIN_RATIO;
-            }
-            if (box_status[elm_id]['h'] > box_status[elm_id]['w'] * MAX_RATIO) {
-                box_status[elm_id]['h'] = box_status[elm_id]['w'] * MAX_RATIO;
-            }
-
-            if (box_status[elm_id]['x'] < SCREEN_WIDTH * 0.05 || Math.random() < SURPRICE_PROB) {
-                box_status[elm_id]['xs'] = 1;
-            }
-            else if (box_status[elm_id]['x'] > SCREEN_WIDTH * 0.95 || Math.random() < SURPRICE_PROB) {
-                box_status[elm_id]['xs'] = -1;
-            }
-            if (box_status[elm_id]['y'] < SCREEN_HEIGHT * 0.05 || Math.random() < SURPRICE_PROB) {
-                box_status[elm_id]['ys'] = 1;
-            }
-            else if (box_status[elm_id]['y'] > SCREEN_HEIGHT * 0.95 || Math.random() < SURPRICE_PROB) {
-                box_status[elm_id]['ys'] = -1;
-            }
-
-            elm.style.left = `${box_status[elm_id]['x']}px`;
-            elm.style.top = `${box_status[elm_id]['y']}px`;
-            elm.style.width = `${box_status[elm_id]['w']}px`;
-            elm.style.height = `${box_status[elm_id]['h']}px`;
-            if (box_status[elm_id]['d'] > DISPLAY_THRESHOLD) {
-                elm.style.display = '';
-            }
-            else {
-                elm.style.display = 'none';
+        function update_legacy_boxes(width, height) {
+            for (const item of boxes) {
+                if (item.box_index >= random_box_count) continue;
+                if (!(plus_threshold - minus_threshold > 0.3 && plus_threshold - minus_threshold < 0.7) || Math.random() < 0.5) {
+                    plus_threshold = random_change(plus_threshold, 0.1, 0.5, 1, 0.3, 0.7);
+                    minus_threshold = random_change(minus_threshold, 0.1, 0, 0.5, 0.3, 0.7);
+                }
+                item.x = random_change(item.x, item.dx, 0, width, plus_threshold, minus_threshold);
+                item.y = random_change(item.y, item.dy, 0, height, plus_threshold, minus_threshold);
+                item.width = random_change(item.width, Math.random() < 0.5 ? 1 : -1, 20, 120, plus_threshold, minus_threshold);
+                item.height = random_change(item.height, Math.random() < 0.5 ? 1 : -1, item.width * 2, item.width * 2.5, plus_threshold, minus_threshold);
+                // 原版未使用的 r 更新仍消耗随机数，保留以保持相同随机序列下的轨迹。
+                random_change(undefined, 0.1, 2, 2.5);
+                item.display_level = random_change(item.display_level, 0.1, 0, 1, plus_threshold, minus_threshold);
+                if (item.x > width) item.x = Math.floor(Math.random() * width);
+                if (item.y > height) item.y = Math.floor(Math.random() * height);
+                item.width = Math.max(20, Math.min(120, item.width));
+                item.height = Math.max(item.width * 2, Math.min(item.width * 2.5, item.height));
+                if (item.x < width * 0.05 || Math.random() < surprise_probability) item.dx = 1;
+                else if (item.x > width * 0.95 || Math.random() < surprise_probability) item.dx = -1;
+                if (item.y < height * 0.05 || Math.random() < surprise_probability) item.dy = 1;
+                else if (item.y > height * 0.95 || Math.random() < surprise_probability) item.dy = -1;
             }
         }
-    }
 
-    init_box_status();
-    setInterval(update_box_status, 60);
-</script>
+        function report_error(message, error) {
+            get('settings_error').textContent = message;
+            get('settings_error').hidden = false;
+            console.error(message, error);
+            settings_panel.hidden = false;
+        }
+
+        function save_settings() {
+            const data = { content: get('content_text').value, image: current_image, settings_hidden: settings_panel.hidden, color: get('content_color').value, clock_position: get('clock_position').value };
+            for (const id of checkbox_ids) data[id] = get(id).checked;
+            for (const id of Object.keys(number_limits)) data[id] = Number(get(id).value);
+            try {
+                localStorage.setItem(storage_key, JSON.stringify(data));
+                get('settings_error').hidden = true;
+            } catch (error) {
+                report_error('设置保存失败，请检查浏览器存储空间；当前设置仍可使用。', error);
+            }
+        }
+
+        function load_settings() {
+            try {
+                const stored = localStorage.getItem(storage_key);
+                if (stored === null) return;
+                const data = JSON.parse(stored);
+                if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('设置格式不正确');
+                for (const id of checkbox_ids) {
+                    if (typeof data[id] === 'boolean') get(id).checked = data[id];
+                }
+                for (const [id, [min, max]] of Object.entries(number_limits)) {
+                    if (typeof data[id] === 'number' && Number.isFinite(data[id]) && data[id] >= min && data[id] <= max && (!id.endsWith('_count') || Number.isInteger(data[id]))) get(id).value = data[id];
+                }
+                if (clock_positions.includes(data.clock_position)) get('clock_position').value = data.clock_position;
+                if (Object.hasOwn(content_colors, data.color)) get('content_color').value = data.color;
+                if (typeof data.content === 'string') get('content_text').value = data.content;
+                if (typeof data.image === 'string' && data.image.startsWith('data:image/')) {
+                    current_image = data.image;
+                    image.src = current_image;
+                }
+                settings_panel.hidden = data.settings_hidden === true;
+            } catch (error) {
+                report_error('设置加载失败，请重新调整设置并保存。', error);
+            }
+        }
+
+        function update_settings() {
+            for (const [id, [min, max, fallback]] of Object.entries(number_limits)) {
+                const input = get(id);
+                const value = input.value === '' ? NaN : Number(input.value);
+                let normalized = Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+                if (id.endsWith('_count')) normalized = Math.round(normalized);
+                input.value = normalized;
+            }
+            for (const { select, summary, radios } of select_controls) {
+                const text = select.selectedOptions[0].textContent;
+                summary.textContent = text;
+                summary.setAttribute('aria-label', `${select.getAttribute('aria-label')}：${text}`);
+                for (const radio of radios) radio.checked = radio.value === select.value;
+            }
+            random_box_count = Number(get('random_box_count').value);
+            bounce_box_count = Number(get('bounce_box_count').value);
+            scan_hold_ms = Number(get('scan_hold').value) * 1000;
+            scan_fade_ms = Number(get('scan_fade').value) * 1000;
+            scale = Number(get('scale').value) / 100;
+            speed = Number(get('speed').value);
+            shake_range = get('random_shake').checked ? Number(get('random_shake_range').value) : 0;
+            const next_scan = get('scan_enabled').checked;
+            if (next_scan !== scan_enabled) {
+                scan_start = performance.now();
+                scan_animation.currentTime = 0;
+                if (next_scan) {
+                    scan_animation.play();
+                    scan_animation.startTime = scan_start;
+                } else scan_animation.pause();
+                previous_phase = 0;
+                previous_line = 0;
+                for (const item of items) { item.row_lit = []; item.previous_y = null; }
+            }
+            scan_enabled = next_scan;
+            if (clock_position !== get('clock_position').value) {
+                const clock_item = items.find(item => item.element.id === 'clock_content');
+                clock_item.row_lit = [];
+                clock_item.previous_y = null;
+                clock_position = get('clock_position').value;
+            }
+            get('clock_content').style.fontSize = `${24 * scale}px`;
+            get('div_container').style.setProperty('--content-color', content_colors[get('content_color').value]);
+            get('div_container').style.setProperty('--content-border', get('content_border').checked ? '2px' : '0px');
+            get('scan_texture').hidden = !scan_enabled;
+            get('scanline').hidden = !scan_enabled;
+            get('text_content').textContent = get('content_text').value;
+            get('text_content').style.fontSize = `${16 * scale}px`;
+            get('time_content').style.fontSize = `${16 * scale}px`;
+            if (image.naturalWidth) image.style.width = `${image.naturalWidth * scale}px`;
+            for (const item of items) {
+                const selected = item.box
+                    ? get(item.bouncing_box ? 'show_bounce_box' : 'show_box').checked && item.box_index < (item.bouncing_box ? bounce_box_count : random_box_count)
+                    : get(`show_${item.element.id.split('_')[0]}`).checked;
+                const was_hidden = item.element.hidden;
+                item.element.hidden = !selected || (item.element.id === 'image_content' && !current_image);
+                if (was_hidden && !item.element.hidden) { item.row_lit = []; item.previous_y = null; }
+                if (!scan_enabled) {
+                    set_scan_mask(item, 'none');
+                } else if (item.row_lit.length === 0) {
+                    set_scan_mask(item, 'linear-gradient(transparent, transparent)');
+                }
+            }
+        }
+
+        image.addEventListener('load', () => { image.style.width = `${image.naturalWidth * scale}px`; });
+        image.addEventListener('error', () => {
+            get('image_content').hidden = true;
+            report_error('图片加载失败，请重新选择有效图片。', new Error('图片解码失败'));
+        });
+        get('image_file').addEventListener('change', event => {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                report_error('请选择图片文件。', new Error('文件类型不正确'));
+                return;
+            }
+            const reader = new FileReader();
+            reader.addEventListener('load', () => {
+                current_image = reader.result;
+                image.src = current_image;
+                update_settings();
+                save_settings();
+            });
+            reader.addEventListener('error', () => report_error('图片读取失败，请重新选择。', reader.error));
+            reader.readAsDataURL(file);
+        });
+        settings_panel.addEventListener('change', event => {
+            if (event.target.id === 'image_file') return;
+            update_settings();
+            save_settings();
+        });
+        for (const id of ['scan_hold', 'scan_fade']) {
+            get(id).addEventListener('wheel', event => {
+                if (event.deltaY === 0) return;
+                event.preventDefault();
+                // 复用输入框原生步进，遵循 step/min，不另设小数精度。
+                update_settings();
+                const input = get(id);
+                if (event.deltaY < 0) input.stepUp();
+                else input.stepDown();
+                update_settings();
+                save_settings();
+            }, { passive: false });
+        }
+        get('reset_scale_speed').addEventListener('click', () => {
+            get('scale').value = '100';
+            get('speed').value = '1';
+            update_settings();
+            save_settings();
+        });
+        function toggle_settings() {
+            for (const { picker } of select_controls) picker.open = false;
+            settings_panel.hidden = !settings_panel.hidden;
+            save_settings();
+        }
+        get('hide_settings').addEventListener('click', toggle_settings);
+        get('div_container').addEventListener('click', toggle_settings);
+
+        function set_scan_mask(item, mask) {
+            if (item.mask === mask) return;
+            item.element.style[mask_property] = mask;
+            item.mask = mask;
+        }
+
+        function update_scan_mask(item, now, line, wrapped, y, height, frame_start) {
+            // 按内容自身的行保留照亮时间，移动后不会丢失已扫过的部分。
+            // 采样间距约 4px，大图最多 128 行；行间由渐变连续插值。
+            const count = Math.max(2, Math.min(128, Math.ceil(height / 4) + 1));
+            if (item.row_lit.length !== count) {
+                const old = item.row_lit;
+                item.row_lit = Array.from({ length: count }, (_, index) =>
+                    old.length ? old[Math.round(index * (old.length - 1) / (count - 1))] : -Infinity);
+            }
+            const cycle_start = now - ((now - scan_start) % 8000);
+            const start_time = wrapped ? cycle_start : frame_start;
+            const start_line = wrapped ? 0 : previous_line;
+            const start_y = wrapped ? y : (item.previous_y ?? y);
+            const start_height = wrapped ? height : (item.previous_height || height);
+            const stops = [];
+            let previous_alpha, before_previous_alpha;
+            let all_clear = true, all_solid = true;
+            for (let index = 0; index < count; index++) {
+                let lit = item.row_lit[index];
+                const fraction = index / (count - 1);
+                const before = start_line - start_y - fraction * start_height;
+                const after = line - y - fraction * height;
+                if (before <= 0 && after >= 0 && after > before) {
+                    lit = start_time + (now - start_time) * (-before / (after - before));
+                    item.row_lit[index] = lit;
+                }
+                const age = now - lit;
+                // 亮起仍为 120ms；保持和渐隐使用设置值，渐隐为零时直接隐藏。
+                const fade_start = 120 + scan_hold_ms;
+                const alpha = age < fade_start ? Math.min(1, age / 120)
+                    : (scan_fade_ms === 0 ? 0 : Math.max(0, 1 - (age - fade_start) / scan_fade_ms));
+                const rounded_alpha = alpha.toFixed(3);
+                all_clear = all_clear && rounded_alpha === '0.000';
+                all_solid = all_solid && rounded_alpha === '1.000';
+                const stop = `rgb(0 0 0 / ${rounded_alpha}) ${(fraction * 100).toFixed(3)}%`;
+                // 连续相同透明度只保留区间首尾，避免大量冗余渐变节点。
+                if (rounded_alpha === previous_alpha && rounded_alpha === before_previous_alpha) stops[stops.length - 1] = stop;
+                else stops.push(stop);
+                before_previous_alpha = previous_alpha;
+                previous_alpha = rounded_alpha;
+            }
+            const mask = all_clear ? 'linear-gradient(transparent, transparent)'
+                : (all_solid ? 'none' : `linear-gradient(to bottom, ${stops.join(',')})`);
+            set_scan_mask(item, mask);
+            item.previous_y = y;
+            item.previous_height = height;
+        }
+
+        function reflect_axis(position, direction, distance, limit) {
+            if (limit <= 0) return [0, direction];
+            // 尺寸变化时先收回有效范围；折返计算保留越界路程，也支持一帧多次碰壁。
+            const start = Math.max(0, Math.min(limit, position));
+            const period = limit * 2;
+            const phase = ((start + direction * distance) % period + period) % period;
+            if (phase === 0) return [0, 1];
+            if (phase === limit) return [limit, -1];
+            return phase < limit ? [phase, direction] : [period - phase, -direction];
+        }
+
+        function animate(now) {
+            // 限制后台恢复时的移动步长；扫描与渐隐仍使用真实经过时间。
+            const frame_start = previous_time;
+            const dt = Math.min((now - previous_time) / 1000, 0.05);
+            previous_time = now;
+            const distance = speed * 100 * dt;
+            const width = innerWidth;
+            const height = innerHeight;
+            const phase = (now - scan_start) / 8000;
+            const line = (phase % 1) * (height + 180);
+            const wrapped = Math.floor(phase) !== Math.floor(previous_phase);
+            const timestamp = Date.now();
+            const clock_second = Math.floor(timestamp / 1000);
+            if (clock_second !== last_clock_second) {
+                const now_date = new Date(timestamp);
+                const date_part = [now_date.getFullYear(), now_date.getMonth() + 1, now_date.getDate()]
+                    .map(value => String(value).padStart(2, '0')).join('-');
+                const time_part = [now_date.getHours(), now_date.getMinutes(), now_date.getSeconds()]
+                    .map(value => String(value).padStart(2, '0')).join(':');
+                get('time_content').textContent = `${date_part} ${time_part}`;
+                get('clock_content').textContent = time_part;
+                last_clock_second = clock_second;
+            }
+            // 默认速度下与第一版一致，每 60ms 更新；活动区域保留为画面上方 60%。
+            box_elapsed += dt * 1000 * speed;
+            while (box_elapsed >= 60) {
+                update_legacy_boxes(width, height * 0.6);
+                box_elapsed -= 60;
+            }
+            // 先批量写尺寸，再统一读布局，最后只提交位移和遮罩。
+            for (const item of items) {
+                if (item.element.hidden || !item.box) continue;
+                if (item.bouncing_box) {
+                    item.width = Math.max(20, Math.min(120, item.width + (Math.random() - 0.5) * dt * 30 * speed));
+                    item.ratio = Math.max(2, Math.min(2.5, item.ratio + (Math.random() - 0.5) * dt * speed));
+                }
+                const box_width = `${item.width * scale}px`;
+                const box_height = `${(item.bouncing_box ? item.width * item.ratio : item.height) * scale}px`;
+                if (item.element.style.width !== box_width) item.element.style.width = box_width;
+                if (item.element.style.height !== box_height) item.element.style.height = box_height;
+            }
+            for (const item of items) {
+                if (item.element.hidden) continue;
+                item.layout_width = item.element.offsetWidth;
+                item.layout_height = item.element.offsetHeight;
+            }
+            for (const item of items) {
+                const element = item.element;
+                if (element.hidden) continue;
+                const element_width = item.layout_width;
+                const element_height = item.layout_height;
+                if (item.box && !item.bouncing_box) {
+                    element.style.visibility = item.display_level > 0.2 ? 'visible' : 'hidden';
+                    element.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)`;
+                    if (scan_enabled && item.display_level > 0.2) update_scan_mask(item, now, line, wrapped, item.y, element_height, frame_start);
+                    continue;
+                }
+                const max_x = Math.max(0, width - element_width);
+                const max_y = Math.max(0, height - element_height);
+                const fixed_clock = element.id === 'clock_content' && clock_position !== 'moving';
+                let x, y;
+                if (fixed_clock) {
+                    // 与参考页一致：水平留边 32px，垂直留边 24px；小窗口内收。
+                    const margin_x = Math.min(32, max_x / 2);
+                    const margin_y = Math.min(24, max_y / 2);
+                    x = clock_position === 'center' ? max_x / 2 : (clock_position.endsWith('right') ? max_x - margin_x : margin_x);
+                    y = clock_position === 'center' ? max_y / 2 : (clock_position.startsWith('bottom') ? max_y - margin_y : margin_y);
+                    item.x = x;
+                    item.y = y;
+                } else {
+                    [item.x, item.dx] = reflect_axis(item.x, item.dx, distance, max_x);
+                    [item.y, item.dy] = reflect_axis(item.y, item.dy, distance, max_y);
+                    x = Math.max(0, Math.min(max_x, item.x + (Math.random() * 2 - 1) * shake_range));
+                    y = Math.max(0, Math.min(max_y, item.y + (Math.random() * 2 - 1) * shake_range));
+                }
+                element.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+                if (scan_enabled) update_scan_mask(item, now, line, wrapped, y, element_height, frame_start);
+            }
+            previous_line = line;
+            previous_phase = phase;
+            requestAnimationFrame(animate);
+        }
+
+        load_settings();
+        update_settings();
+        requestAnimationFrame(animate);
+    </script>
+</body>
 </html>
