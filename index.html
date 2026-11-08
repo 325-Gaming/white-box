@@ -9,9 +9,8 @@
         html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
         body { background: #000; }
         #div_container { position: relative; width: 100%; height: 100%; overflow: hidden; }
-        .content { position: absolute; left: 0; top: 0; color: var(--content-color, #fff); white-space: nowrap; pointer-events: none; }
-        #text_content, #time_content, #image_content { border: var(--content-border, 0px) solid currentColor; }
-        .white-box { border: 2px solid currentColor; box-sizing: border-box; }
+        .content { position: absolute; left: 0; top: 0; color: var(--content-color, #fff); white-space: nowrap; pointer-events: none; border: 0 solid currentColor; }
+        .white-box { box-sizing: border-box; }
         #clock_content {
             font: 24px "fusion-pixel-12px-proportional-latin", monospace;
             text-shadow: 0 0 8px currentColor; letter-spacing: 2px;
@@ -24,7 +23,19 @@
             background: #eee; color: #111; font: 14px/1.6 sans-serif;
         }
         h2, p { margin: 0 0 10px; }
-        fieldset { margin: 0 0 10px; padding: 6px 10px; border: 1px solid #888; }
+        .table-scroll { overflow-x: auto; margin-bottom: 8px; }
+        .settings-table { width: 100%; min-width: 640px; border-collapse: collapse; }
+        .content-settings { min-width: 1240px; }
+        .content-settings input[type="number"] { width: 58px; }
+        .settings-table caption { text-align: left; font-weight: bold; padding: 0 0 4px; }
+        .settings-table th, .settings-table td { border: 1px solid #888; padding: 4px 8px; text-align: left; vertical-align: top; }
+        .settings-table thead th { background: #ddd; }
+        .settings-table th[scope="row"] { font-weight: normal; white-space: nowrap; }
+        .settings-table .flag { width: 42px; text-align: center; }
+        .settings-table .flag input { margin: 4px 0; }
+        .settings-table input[type="text"] { box-sizing: border-box; width: 100%; min-width: 150px; }
+        .settings-table input[type="file"] { max-width: 260px; }
+        .settings-note { font-size: 12px; margin-bottom: 8px; }
         label { display: inline-block; }
         input[type="number"] { width: 70px; }
         .select-field { display: inline-block; vertical-align: top; }
@@ -59,37 +70,123 @@
     <section id="div_settings" aria-label="设置">
         <p>使用方法：在 OBS“来源”添加“浏览器源”，URL 填写本页面链接，再使用“交互”调整设置。点击画面可显示或隐藏设置。</p>
         <h2>设置</h2>
-        <fieldset>
-            <legend>显示内容（可多选）</legend>
-            <label><input type="checkbox" id="show_text" checked>文字</label>
-            <input type="text" id="content_text" placeholder="在页面上显示的文字" value="Hello World!" aria-label="显示文字"><br>
-            <label><input type="checkbox" id="show_time">当前时间（日期和时间）</label><br>
-            <label><input type="checkbox" id="show_clock">扫描线时钟（时:分:秒）</label>
-            <span class="select-field">位置：<select id="clock_position" aria-label="时钟位置">
+        <div class="table-scroll">
+            <table class="settings-table">
+                <caption>通用设置</caption>
+                <tbody>
+                    <tr>
+                        <th scope="row"><label for="scan_enabled">扫描线特效</label></th>
+                        <td><label><input type="checkbox" id="scan_enabled" checked>启用</label></td>
+                        <th scope="row">内容颜色</th>
+                        <td><select id="content_color" aria-label="内容颜色"><option value="white">白色</option><option value="green">绿色（wei-matrix）</option></select></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="scan_hold">完全显示时间</label></th>
+                        <td><input type="number" id="scan_hold" min="0" step="0.05" value="3.25"> 秒</td>
+                        <th scope="row"><label for="scan_fade">渐隐时间</label></th>
+                        <td><input type="number" id="scan_fade" min="0" step="0.05" value="3.25"> 秒</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="settings-note">时间输入框支持滚轮调整，每次 0.05 秒。未开启常亮的项目随扫描线逐行亮起、保持后渐隐；关闭扫描线后持续显示。</p>
+        <div class="table-scroll">
+            <table class="settings-table content-settings">
+                <caption>显示内容（可多选）</caption>
+                <thead><tr><th scope="col">显示</th><th scope="col">项目</th><th scope="col">内容／位置／数量</th><th scope="col">更亮</th><th scope="col">常亮</th><th scope="col">抖动</th><th scope="col">幅度（px）</th><th scope="col">缩放（%）</th><th scope="col">速度（x）</th><th scope="col">重置缩放和速度</th><th scope="col">外框</th><th scope="col">padding（px）</th></tr></thead>
+                <tbody>
+                <tr>
+                    <td class="flag"><input type="checkbox" id="show_text" aria-label="显示文字" checked></td>
+                    <th scope="row"><label for="show_text">文字</label></th>
+                    <td><input type="text" id="content_text" placeholder="在页面上显示的文字" value="Hello World!" aria-label="显示文字"></td>
+                    <td class="flag"><input type="checkbox" id="text_brighter" aria-label="文字更亮"></td>
+                    <td class="flag"><input type="checkbox" id="text_always_on" aria-label="文字常亮"></td>
+                    <td class="flag"><input type="checkbox" id="text_random_shake" aria-label="文字随机抖动" checked></td>
+                    <td><input type="number" id="text_shake_range" min="0" max="100" value="1" aria-label="文字抖动幅度"></td>
+                    <td><input type="number" id="text_scale" min="1" max="1000" value="100" aria-label="文字缩放"></td>
+                    <td><input type="number" id="text_speed" min="0.05" max="10" step="0.05" value="1" aria-label="文字速度"></td>
+                    <td><button type="button" id="text_reset" aria-label="重置文字缩放和速度">重置</button></td>
+                    <td class="flag"><input type="checkbox" id="text_border" aria-label="文字外框"></td>
+                    <td><input type="number" id="text_padding" min="0" step="1" value="1" aria-label="文字外框内边距"></td>
+                </tr>
+                <tr>
+                    <td class="flag"><input type="checkbox" id="show_time" aria-label="显示当前时间（日期和时间）"></td>
+                    <th scope="row"><label for="show_time">当前时间（日期和时间）</label></th>
+                    <td>YYYY-MM-DD HH:mm:ss</td>
+                    <td class="flag"><input type="checkbox" id="time_brighter" aria-label="当前时间（日期和时间）更亮"></td>
+                    <td class="flag"><input type="checkbox" id="time_always_on" aria-label="当前时间（日期和时间）常亮"></td>
+                    <td class="flag"><input type="checkbox" id="time_random_shake" aria-label="日期时间随机抖动" checked></td>
+                    <td><input type="number" id="time_shake_range" min="0" max="100" value="1" aria-label="日期时间抖动幅度"></td>
+                    <td><input type="number" id="time_scale" min="1" max="1000" value="100" aria-label="日期时间缩放"></td>
+                    <td><input type="number" id="time_speed" min="0.05" max="10" step="0.05" value="1" aria-label="日期时间速度"></td>
+                    <td><button type="button" id="time_reset" aria-label="重置日期时间缩放和速度">重置</button></td>
+                    <td class="flag"><input type="checkbox" id="time_border" aria-label="日期时间外框"></td>
+                    <td><input type="number" id="time_padding" min="0" step="1" value="1" aria-label="日期时间外框内边距"></td>
+                </tr>
+                <tr>
+                    <td class="flag"><input type="checkbox" id="show_clock" aria-label="显示时钟（时:分:秒）"></td>
+                    <th scope="row"><label for="show_clock">时钟（时:分:秒）</label></th>
+                    <td><span class="select-field">位置：<select id="clock_position" aria-label="时钟位置">
                 <option value="topright">固定右上</option><option value="topleft">固定左上</option>
                 <option value="bottomright">固定右下</option><option value="bottomleft">固定左下</option>
                 <option value="center">固定居中</option><option value="moving">跟随移动</option>
-            </select></span><br>
-            <label><input type="checkbox" id="show_image">图片</label>
-            <input accept="image/*" type="file" id="image_file" aria-label="选择图片"><br>
-            <label><input type="checkbox" id="show_box" checked>随机移动白框（第一版）</label>
-            <span class="select-field">数量：<select id="random_box_count" aria-label="随机移动白框数量"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></span><br>
-            <label><input type="checkbox" id="show_bounce_box">反弹白框</label>
-            <span class="select-field">数量：<select id="bounce_box_count" aria-label="反弹白框数量"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></span>
-        </fieldset>
-        <p>
-            <label><input type="checkbox" id="scan_enabled" checked>扫描线特效</label>
-            <span>随扫描线从上到下逐行亮起、保持后渐隐；关闭后持续显示。</span><br>
-            <span class="select-field">内容颜色：<select id="content_color" aria-label="内容颜色"><option value="white">白色</option><option value="green">绿色（wei-matrix）</option></select></span>（文字、时间、时钟和白框；图片保留原色）<br>
-            <label>完全显示时间：<input type="number" id="scan_hold" min="0" step="0.05" value="3.25"> 秒</label>
-            <label>渐隐时间：<input type="number" id="scan_fade" min="0" step="0.05" value="3.25"> 秒</label>（滚轮调整，每次 0.05 秒）<br>
-            <label><input type="checkbox" id="content_border">文字、时间和图片外框</label><br>
-            <label><input type="checkbox" id="random_shake" checked>随机抖动</label>
-            <label>幅度：<input type="number" id="random_shake_range" min="0" max="100" value="1"> px</label><br>
-            <label>缩放：<input type="number" id="scale" min="1" max="1000" value="100"> %</label>
-            <label>速度：<input type="number" id="speed" min="0.05" max="10" step="0.05" value="1"> x</label>
-            <button type="button" id="reset_scale_speed">重置缩放和速度</button>
-        </p>
+            </select></span></td>
+                    <td class="flag"><input type="checkbox" id="clock_brighter" aria-label="时钟（时:分:秒）更亮"></td>
+                    <td class="flag"><input type="checkbox" id="clock_always_on" aria-label="时钟（时:分:秒）常亮"></td>
+                    <td class="flag"><input type="checkbox" id="clock_random_shake" aria-label="时钟随机抖动" checked></td>
+                    <td><input type="number" id="clock_shake_range" min="0" max="100" value="1" aria-label="时钟抖动幅度"></td>
+                    <td><input type="number" id="clock_scale" min="1" max="1000" value="100" aria-label="时钟缩放"></td>
+                    <td><input type="number" id="clock_speed" min="0.05" max="10" step="0.05" value="1" aria-label="时钟速度"></td>
+                    <td><button type="button" id="clock_reset" aria-label="重置时钟缩放和速度">重置</button></td>
+                    <td class="flag"><input type="checkbox" id="clock_border" aria-label="时钟外框"></td>
+                    <td><input type="number" id="clock_padding" min="0" step="1" value="1" aria-label="时钟外框内边距"></td>
+                </tr>
+                <tr>
+                    <td class="flag"><input type="checkbox" id="show_image" aria-label="显示图片"></td>
+                    <th scope="row"><label for="show_image">图片</label></th>
+                    <td><input accept="image/*" type="file" id="image_file" aria-label="选择图片"></td>
+                    <td class="flag"><input type="checkbox" id="image_brighter" aria-label="图片更亮"></td>
+                    <td class="flag"><input type="checkbox" id="image_always_on" aria-label="图片常亮"></td>
+                    <td class="flag"><input type="checkbox" id="image_random_shake" aria-label="图片随机抖动" checked></td>
+                    <td><input type="number" id="image_shake_range" min="0" max="100" value="1" aria-label="图片抖动幅度"></td>
+                    <td><input type="number" id="image_scale" min="1" max="1000" value="100" aria-label="图片缩放"></td>
+                    <td><input type="number" id="image_speed" min="0.05" max="10" step="0.05" value="1" aria-label="图片速度"></td>
+                    <td><button type="button" id="image_reset" aria-label="重置图片缩放和速度">重置</button></td>
+                    <td class="flag"><input type="checkbox" id="image_border" aria-label="图片外框"></td>
+                    <td><input type="number" id="image_padding" min="0" step="1" value="1" aria-label="图片外框内边距"></td>
+                </tr>
+                <tr>
+                    <td class="flag"><input type="checkbox" id="show_box" aria-label="显示随机移动白框（第一版）" checked></td>
+                    <th scope="row"><label for="show_box">随机移动白框（第一版）</label></th>
+                    <td><span class="select-field">数量：<select id="random_box_count" aria-label="随机移动白框数量"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></span></td>
+                    <td class="flag"><input type="checkbox" id="box_brighter" aria-label="随机移动白框（第一版）更亮"></td>
+                    <td class="flag"><input type="checkbox" id="box_always_on" aria-label="随机移动白框（第一版）常亮"></td>
+                    <td class="flag"><input type="checkbox" id="box_random_shake" aria-label="随机移动白框随机抖动"></td>
+                    <td><input type="number" id="box_shake_range" min="0" max="100" value="1" aria-label="随机移动白框抖动幅度"></td>
+                    <td><input type="number" id="box_scale" min="1" max="1000" value="100" aria-label="随机移动白框缩放"></td>
+                    <td><input type="number" id="box_speed" min="0.05" max="10" step="0.05" value="1" aria-label="随机移动白框速度"></td>
+                    <td><button type="button" id="box_reset" aria-label="重置随机移动白框缩放和速度">重置</button></td>
+                    <td class="flag"><input type="checkbox" id="box_border" aria-label="随机移动白框外框" checked></td>
+                    <td><input type="number" id="box_padding" min="0" step="1" value="1" aria-label="随机移动白框外框内边距"></td>
+                </tr>
+                <tr>
+                    <td class="flag"><input type="checkbox" id="show_bounce_box" aria-label="显示反弹白框"></td>
+                    <th scope="row"><label for="show_bounce_box">反弹白框</label></th>
+                    <td><span class="select-field">数量：<select id="bounce_box_count" aria-label="反弹白框数量"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></span></td>
+                    <td class="flag"><input type="checkbox" id="bounce_box_brighter" aria-label="反弹白框更亮"></td>
+                    <td class="flag"><input type="checkbox" id="bounce_box_always_on" aria-label="反弹白框常亮"></td>
+                    <td class="flag"><input type="checkbox" id="bounce_box_random_shake" aria-label="反弹白框随机抖动" checked></td>
+                    <td><input type="number" id="bounce_box_shake_range" min="0" max="100" value="1" aria-label="反弹白框抖动幅度"></td>
+                    <td><input type="number" id="bounce_box_scale" min="1" max="1000" value="100" aria-label="反弹白框缩放"></td>
+                    <td><input type="number" id="bounce_box_speed" min="0.05" max="10" step="0.05" value="1" aria-label="反弹白框速度"></td>
+                    <td><button type="button" id="bounce_box_reset" aria-label="重置反弹白框缩放和速度">重置</button></td>
+                    <td class="flag"><input type="checkbox" id="bounce_box_border" aria-label="反弹白框外框" checked></td>
+                    <td><input type="number" id="bounce_box_padding" min="0" step="1" value="1" aria-label="反弹白框外框内边距"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="settings-note">更亮使用亮绿色与发光效果；图片保留原色并提高亮度。常亮跳过扫描点亮与渐隐，随机移动白框仍保留原版闪现。每行重置仅恢复该项目的缩放 100%、速度 1x；固定时钟不参与抖动。</p>
         <p><button type="button" id="hide_settings">隐藏设置</button></p>
         <p id="settings_error" role="alert" hidden></p>
     </section>
@@ -115,8 +212,15 @@
         const get = id => document.getElementById(id);
         const page_id = new URLSearchParams(location.search).get('id') || 'default';
         const storage_key = `white_box_v3_settings:${page_id}`;
-        const checkbox_ids = ['show_text', 'show_time', 'show_clock', 'show_image', 'show_box', 'show_bounce_box', 'content_border', 'scan_enabled', 'random_shake'];
-        const number_limits = { random_shake_range: [0, 100, 1], scale: [1, 1000, 100], speed: [0.05, 10, 1], random_box_count: [1, 5, 3], bounce_box_count: [1, 5, 3], scan_hold: [0, Infinity, 3.25], scan_fade: [0, Infinity, 3.25] };
+        const content_types = ['text', 'time', 'clock', 'image', 'box', 'bounce_box'];
+        const checkbox_ids = [...content_types.flatMap(type => [`show_${type}`, `${type}_brighter`, `${type}_always_on`, `${type}_random_shake`, `${type}_border`]), 'scan_enabled'];
+        const number_limits = {
+            random_box_count: [1, 5, 3], bounce_box_count: [1, 5, 3], scan_hold: [0, Infinity, 3.25], scan_fade: [0, Infinity, 3.25],
+            ...Object.fromEntries(content_types.flatMap(type => [
+                [`${type}_shake_range`, [0, 100, 1]], [`${type}_scale`, [1, 1000, 100]], [`${type}_speed`, [0.05, 10, 1]], [`${type}_padding`, [0, Infinity, 1]]
+            ]))
+        };
+        const type_settings = {};
         const clock_positions = ['topright', 'topleft', 'bottomright', 'bottomleft', 'center', 'moving'];
         let clock_position = 'topright';
         const content_colors = { white: '#ffffff', green: '#008866' };
@@ -173,9 +277,6 @@
         });
         let current_image = '';
         let scan_enabled = true;
-        let scale = 1;
-        let speed = 1;
-        let shake_range = 1;
         let random_box_count = 3;
         let bounce_box_count = 3;
         let scan_hold_ms = 3250;
@@ -191,7 +292,8 @@
         let previous_time = scan_start;
         let last_clock_second = -1;
         const items = [...document.querySelectorAll('.content')].map(element => ({
-            element, box: element.classList.contains('white-box'), bouncing_box: element.classList.contains('bounce-box'), x: Math.random() * innerWidth * 0.7,
+            element, type: element.classList.contains('white-box') ? (element.classList.contains('bounce-box') ? 'bounce_box' : 'box') : element.id.split('_')[0],
+            always_on: false, box: element.classList.contains('white-box'), bouncing_box: element.classList.contains('bounce-box'), x: Math.random() * innerWidth * 0.7,
             y: Math.random() * innerHeight * 0.7, dx: 1, dy: 1,
             width: 20, height: 40, ratio: 2, display_level: 1, box_index: 0,
             row_lit: [], previous_y: null, previous_height: 0, mask: null
@@ -278,7 +380,7 @@
                     if (typeof data[id] === 'boolean') get(id).checked = data[id];
                 }
                 for (const [id, [min, max]] of Object.entries(number_limits)) {
-                    if (typeof data[id] === 'number' && Number.isFinite(data[id]) && data[id] >= min && data[id] <= max && (!id.endsWith('_count') || Number.isInteger(data[id]))) get(id).value = data[id];
+                    if (typeof data[id] === 'number' && Number.isFinite(data[id]) && data[id] >= min && data[id] <= max && (!(id.endsWith('_count') || id.endsWith('_padding')) || Number.isInteger(data[id]))) get(id).value = data[id];
                 }
                 if (clock_positions.includes(data.clock_position)) get('clock_position').value = data.clock_position;
                 if (Object.hasOwn(content_colors, data.color)) get('content_color').value = data.color;
@@ -298,7 +400,7 @@
                 const input = get(id);
                 const value = input.value === '' ? NaN : Number(input.value);
                 let normalized = Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
-                if (id.endsWith('_count')) normalized = Math.round(normalized);
+                if (id.endsWith('_count') || id.endsWith('_padding')) normalized = Math.round(normalized);
                 input.value = normalized;
             }
             for (const { select, summary, radios } of select_controls) {
@@ -311,9 +413,15 @@
             bounce_box_count = Number(get('bounce_box_count').value);
             scan_hold_ms = Number(get('scan_hold').value) * 1000;
             scan_fade_ms = Number(get('scan_fade').value) * 1000;
-            scale = Number(get('scale').value) / 100;
-            speed = Number(get('speed').value);
-            shake_range = get('random_shake').checked ? Number(get('random_shake_range').value) : 0;
+            for (const type of content_types) {
+                type_settings[type] = {
+                    scale: Number(get(`${type}_scale`).value) / 100,
+                    speed: Number(get(`${type}_speed`).value),
+                    shake_range: get(`${type}_random_shake`).checked ? Number(get(`${type}_shake_range`).value) : 0,
+                    border: get(`${type}_border`).checked,
+                    padding: Number(get(`${type}_padding`).value)
+                };
+            }
             const next_scan = get('scan_enabled').checked;
             if (next_scan !== scan_enabled) {
                 scan_start = performance.now();
@@ -333,23 +441,31 @@
                 clock_item.previous_y = null;
                 clock_position = get('clock_position').value;
             }
-            get('clock_content').style.fontSize = `${24 * scale}px`;
+            get('clock_content').style.fontSize = `${24 * type_settings.clock.scale}px`;
             get('div_container').style.setProperty('--content-color', content_colors[get('content_color').value]);
-            get('div_container').style.setProperty('--content-border', get('content_border').checked ? '2px' : '0px');
             get('scan_texture').hidden = !scan_enabled;
             get('scanline').hidden = !scan_enabled;
             get('text_content').textContent = get('content_text').value;
-            get('text_content').style.fontSize = `${16 * scale}px`;
-            get('time_content').style.fontSize = `${16 * scale}px`;
-            if (image.naturalWidth) image.style.width = `${image.naturalWidth * scale}px`;
+            get('text_content').style.fontSize = `${16 * type_settings.text.scale}px`;
+            get('time_content').style.fontSize = `${16 * type_settings.time.scale}px`;
+            if (image.naturalWidth) image.style.width = `${image.naturalWidth * type_settings.image.scale}px`;
             for (const item of items) {
-                const selected = item.box
-                    ? get(item.bouncing_box ? 'show_bounce_box' : 'show_box').checked && item.box_index < (item.bouncing_box ? bounce_box_count : random_box_count)
-                    : get(`show_${item.element.id.split('_')[0]}`).checked;
+                const always_on = get(`${item.type}_always_on`).checked;
+                if (item.always_on !== always_on) { item.row_lit = []; item.previous_y = null; }
+                item.always_on = always_on;
+                const config = type_settings[item.type];
+                item.element.style.borderWidth = config.border ? '2px' : '0px';
+                item.element.style.padding = config.border ? `${config.padding}px` : '0px';
+                const brighter = get(`${item.type}_brighter`).checked;
+                item.element.style.color = brighter ? '#00ffbb' : '';
+                item.element.style.textShadow = brighter && !item.box && item.type !== 'image' ? '0 0 8px #00ffbb80' : '';
+                item.element.style.boxShadow = brighter && config.border && (item.box || item.type === 'image') ? '0 0 8px #00ffbb80' : '';
+                if (item.type === 'image') image.style.filter = brighter ? 'brightness(1.4)' : '';
+                const selected = get(`show_${item.type}`).checked && (!item.box || item.box_index < (item.bouncing_box ? bounce_box_count : random_box_count));
                 const was_hidden = item.element.hidden;
                 item.element.hidden = !selected || (item.element.id === 'image_content' && !current_image);
                 if (was_hidden && !item.element.hidden) { item.row_lit = []; item.previous_y = null; }
-                if (!scan_enabled) {
+                if (!scan_enabled || item.always_on) {
                     set_scan_mask(item, 'none');
                 } else if (item.row_lit.length === 0) {
                     set_scan_mask(item, 'linear-gradient(transparent, transparent)');
@@ -357,7 +473,7 @@
             }
         }
 
-        image.addEventListener('load', () => { image.style.width = `${image.naturalWidth * scale}px`; });
+        image.addEventListener('load', () => { image.style.width = `${image.naturalWidth * type_settings.image.scale}px`; });
         image.addEventListener('error', () => {
             get('image_content').hidden = true;
             report_error('图片加载失败，请重新选择有效图片。', new Error('图片解码失败'));
@@ -397,12 +513,14 @@
                 save_settings();
             }, { passive: false });
         }
-        get('reset_scale_speed').addEventListener('click', () => {
-            get('scale').value = '100';
-            get('speed').value = '1';
-            update_settings();
-            save_settings();
-        });
+        for (const type of content_types) {
+            get(`${type}_reset`).addEventListener('click', () => {
+                get(`${type}_scale`).value = '100';
+                get(`${type}_speed`).value = '1';
+                update_settings();
+                save_settings();
+            });
+        }
         function toggle_settings() {
             for (const { picker } of select_controls) picker.open = false;
             settings_panel.hidden = !settings_panel.hidden;
@@ -481,7 +599,6 @@
             const frame_start = previous_time;
             const dt = Math.min((now - previous_time) / 1000, 0.05);
             previous_time = now;
-            const distance = speed * 100 * dt;
             const width = innerWidth;
             const height = innerHeight;
             const phase = (now - scan_start) / 8000;
@@ -500,7 +617,7 @@
                 last_clock_second = clock_second;
             }
             // 默认速度下与第一版一致，每 60ms 更新；活动区域保留为画面上方 60%。
-            box_elapsed += dt * 1000 * speed;
+            box_elapsed += dt * 1000 * type_settings.box.speed;
             while (box_elapsed >= 60) {
                 update_legacy_boxes(width, height * 0.6);
                 box_elapsed -= 60;
@@ -508,6 +625,7 @@
             // 先批量写尺寸，再统一读布局，最后只提交位移和遮罩。
             for (const item of items) {
                 if (item.element.hidden || !item.box) continue;
+                const { scale, speed } = type_settings[item.type];
                 if (item.bouncing_box) {
                     item.width = Math.max(20, Math.min(120, item.width + (Math.random() - 0.5) * dt * 30 * speed));
                     item.ratio = Math.max(2, Math.min(2.5, item.ratio + (Math.random() - 0.5) * dt * speed));
@@ -527,10 +645,14 @@
                 if (element.hidden) continue;
                 const element_width = item.layout_width;
                 const element_height = item.layout_height;
+                const { speed, shake_range } = type_settings[item.type];
+                const distance = speed * 100 * dt;
                 if (item.box && !item.bouncing_box) {
                     element.style.visibility = item.display_level > 0.2 ? 'visible' : 'hidden';
-                    element.style.transform = `translate3d(${item.x}px, ${item.y}px, 0)`;
-                    if (scan_enabled && item.display_level > 0.2) update_scan_mask(item, now, line, wrapped, item.y, element_height, frame_start);
+                    const x = item.x + (shake_range ? (Math.random() * 2 - 1) * shake_range : 0);
+                    const y = item.y + (shake_range ? (Math.random() * 2 - 1) * shake_range : 0);
+                    element.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+                    if (scan_enabled && !item.always_on && item.display_level > 0.2) update_scan_mask(item, now, line, wrapped, y, element_height, frame_start);
                     continue;
                 }
                 const max_x = Math.max(0, width - element_width);
@@ -552,7 +674,7 @@
                     y = Math.max(0, Math.min(max_y, item.y + (Math.random() * 2 - 1) * shake_range));
                 }
                 element.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-                if (scan_enabled) update_scan_mask(item, now, line, wrapped, y, element_height, frame_start);
+                if (scan_enabled && !item.always_on) update_scan_mask(item, now, line, wrapped, y, element_height, frame_start);
             }
             previous_line = line;
             previous_phase = phase;
